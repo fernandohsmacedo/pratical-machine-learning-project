@@ -1,0 +1,89 @@
+---
+title: "Pratical Machine Learning Project"
+author: "Fernando Henrique Macedo"
+date: "20 de junho de 2016"
+output: html_document
+---
+
+# Load libraries and data
+
+## Libraries
+```{r libraries, message=FALSE}
+library(caret)
+library(randomForest)
+```
+
+## Data
+```{r data}
+trainSet <- read.csv("pml-training.csv")
+testSet <- read.csv("pml-testing.csv")
+```
+
+# Cleaning data
+
+The trainSet contains `r ncol(trainSet)` columns. First, we should clean the columns with lots of NA or blank values.
+
+```{r clean NA}
+NA_cols <- sapply(trainSet, function(x) sum(is.na(x) | x == ""))
+table(NA_cols)
+```
+
+The line above gave us an array with the number of non-NA values per column. Looking at the unique values of it, there are two possible values (`r unique(NA_cols)`), what shows a lot of columns with only NA values. So, we should remove them.
+
+```{r remove NA}
+trainClean <- trainSet[, NA_cols == 0]
+dim(trainClean)
+```
+
+# Feature selection
+
+Observing the first rows of the cleaned data:
+
+```{r firts rows}
+head(trainClean)
+```
+
+
+The first 7 columns seem irrelevant as features.
+
+```{r feature}
+trainFinal <- trainClean[, -(1:7)]
+```
+
+# Spliting data
+
+```{r splitting}
+set.seed(25361)
+splt_idx <- createDataPartition(trainFinal$classe, p = 0.7, list = FALSE)
+training <- trainFinal[splt_idx,]
+testing <- trainFinal[-splt_idx,]
+```
+
+# Modeling
+
+We will use a Random Forest with 10-fold validation to improve accuracy.
+
+```{r randomforest}
+trainingModel <- train(classe ~ ., data = training, method = "rf",
+                       trControl = trainControl(method = "cv", number = 10),
+                       ntree = 251)
+trainingModel
+```
+
+Now, we could observe the accuracy of the model in a confusion matrix
+
+```{r confusion}
+testPrediction <- predict(trainingModel, testing)
+confusionMatrix(testing$classe, testPrediction)
+```
+
+So, we have an accuracy of `r confusionMatrix(testing$classe, testPrediction)$overall[[1]]`.
+
+# Predicting the Test Data
+
+```{r pred test}
+testData <- testSet[, which(NA_cols == 0)]
+testData <- testData[, -c(1:7, ncol(testData))]
+predict(trainingModel, testData)
+```
+
